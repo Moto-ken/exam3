@@ -7,6 +7,8 @@
 # include <stdlib.h>
 # include <unistd.h>
 
+static int		g_error = 0;
+
 typedef struct node
 {
 	enum

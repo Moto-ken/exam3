@@ -61,6 +61,7 @@ int	picoshell(char **cmd[])
 
 	i = 0;
 	prev_fd = -1;
+	has_next = 0;
 	if (!cmd || !cmd[0])
 		return (1);
 	while (cmd[i])

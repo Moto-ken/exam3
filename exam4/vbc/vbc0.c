@@ -1,5 +1,5 @@
 
-#include "vbc.h"
+#include "asfd.h"
 
 node	*new_node(node n)
 {
@@ -57,6 +57,7 @@ node	*parse_value(char **s)
 {
 	node	*ret;
 	node	tmp;
+	node	*next;
 
 	if (isdigit(**s))
 	{
@@ -64,10 +65,10 @@ node	*parse_value(char **s)
 		tmp.val = **s - '0';
 		tmp.l = NULL;
 		tmp.r = NULL;
+		(*s)++;
 		ret = new_node(tmp);
 		if (!ret)
 			return (NULL);
-		(*s)++;
 		if (isdigit(**s) || **s == '(')
 		{
 			destroy_tree(ret);
@@ -76,17 +77,17 @@ node	*parse_value(char **s)
 		}
 		return (ret);
 	}
-	if (accept(s, '('))
+	if (expect(s, '('))
 	{
-		ret = parse_add(s);
-		if (!ret)
+		next = parse_add(s);
+		if (!next)
 			return (NULL);
 		if (!expect(s, ')'))
 		{
-			destroy_tree(ret);
+			destroy_tree(next);
 			return (NULL);
 		}
-		return (ret);
+		return (next);
 	}
 	unexpected(**s);
 	return (NULL);
@@ -106,7 +107,10 @@ node	*parse_multi(char **s)
 	{
 		right = parse_value(s);
 		if (!right)
-			return (destroy_tree(left), NULL);
+		{
+			destroy_tree(left);
+			return (NULL);
+		}
 		tmp.type = MULTI;
 		tmp.l = left;
 		tmp.r = right;
@@ -136,7 +140,10 @@ node	*parse_add(char **s)
 	{
 		right = parse_multi(s);
 		if (!right)
-			return (destroy_tree(left), NULL);
+		{
+			destroy_tree(left);
+			return (NULL);
+		}
 		tmp.type = ADD;
 		tmp.l = left;
 		tmp.r = right;
@@ -156,11 +163,11 @@ node	*parse_tree(char *s)
 {
 	node	*ret;
 
-	if (!*s)
-		return (NULL);
 	ret = parse_add(&s);
 	if (!ret)
+	{
 		return (NULL);
+	}
 	return (ret);
 }
 
@@ -174,8 +181,6 @@ int	eval_tree(node *tree)
 		return (eval_tree(tree->l) * eval_tree(tree->r));
 	case VAL:
 		return (tree->val);
-	default:
-		return (0);
 	}
 }
 
