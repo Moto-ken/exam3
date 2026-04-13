@@ -1,10 +1,22 @@
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
-void	child_process(int prev_fd, int *fd, int has_next, char **argv)
+void	close_fds(int prev_fd, int has_next, int *fd)
+{
+	if (prev_fd != -1)
+		close(prev_fd);
+	if (has_next)
+	{
+		close(fd[0]);
+		close(fd[1]);
+	}
+}
+
+void	child_process(char *cmd[], int prev_fd, int has_next, int *fd)
 {
 	if (prev_fd != -1)
 	{
@@ -17,11 +29,11 @@ void	child_process(int prev_fd, int *fd, int has_next, char **argv)
 		close(fd[0]);
 		close(fd[1]);
 	}
-	execvp(argv[0], argv);
+	execvp(cmd[0], cmd);
 	exit(1);
 }
 
-void	parent_process(int *prev_fd, int *fd, int has_next)
+void	parent_process(int *prev_fd, int has_next, int *fd)
 {
 	if (*prev_fd != -1)
 		close(*prev_fd);
@@ -32,38 +44,40 @@ void	parent_process(int *prev_fd, int *fd, int has_next)
 	}
 }
 
-int	picoshell(char **argv[])
+int	picoshell(char **cmd[])
 {
 	int		fd[2];
 	pid_t	pid;
 	int		i;
-	int		has_next;
 	int		prev_fd;
+	int		has_next;
 
-	has_next = 0;
 	prev_fd = -1;
+	has_next = 0;
 	i = 0;
-	if (!argv || !argv[0])
+	if (!cmd)
 		return (1);
-	while (argv[i])
+	while (cmd[i])
 	{
-		has_next = argv[i + 1] != NULL;
+		has_next = cmd[i + 1] != NULL;
 		if (has_next)
 		{
 			if (pipe(fd) < 0)
+			{
+				close_fds(prev_fd, 0, fd);
 				return (1);
+			}
 		}
 		pid = fork();
 		if (pid < 0)
 		{
-			close(fd[0]);
-			close(fd[1]);
+			close_fds(prev_fd, has_next, fd);
 			return (1);
 		}
-		if (pid == 0)
-			child_process(prev_fd, fd, has_next, argv[i]);
+		else if (pid == 0)
+			child_process(cmd[i], prev_fd, has_next, fd);
 		else
-			parent_process(&prev_fd, fd, has_next);
+			parent_process(&prev_fd, has_next, fd);
 		i++;
 	}
 	while (wait(NULL) > 0)
@@ -73,10 +87,10 @@ int	picoshell(char **argv[])
 
 int	main(void)
 {
-	char	*cmd1[] = {"/bin/ls", NULL};
-	char	*cmd2[] = {"cat", NULL};
-	char	**cmds[] = {cmd1, cmd2, NULL};
+	char	*str1[] = {"ls", "-a", NULL};
+	char	*str2[] = {"grep", "picoshell", NULL};
+	char	**cmd[] = {str1, str2, NULL};
 
-	picoshell(cmds);
+	picoshell(cmd);
 	return (0);
 }

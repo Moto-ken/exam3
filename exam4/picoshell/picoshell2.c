@@ -1,144 +1,92 @@
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
-typedef struct s_cmd
+void	child_process(char *cmd[], int prev_fd, int has_next, int *fd)
 {
-	char			**argv;
-	int				fd[2];
-	struct s_cmd	*next;
-}					t_cmd;
-
-void	free_struct(t_cmd *head)
-{
-	t_cmd	*cur;
-	t_cmd	*tmp;
-
-	cur = head;
-	while (cur)
+	if (prev_fd != -1)
 	{
-		tmp = cur->next;
-		free(cur);
-		cur = tmp;
+		dup2(prev_fd, STDIN_FILENO);
+		close(prev_fd);
 	}
-}
-
-t_cmd	*init_struct(char ***cmd)
-{
-	t_cmd	*head;
-	t_cmd	*prev;
-	int		i;
-	t_cmd	*cur;
-
-	head = NULL;
-	prev = NULL;
-	i = 0;
-	while (cmd[i])
+	if (has_next)
 	{
-		cur = malloc(sizeof(t_cmd));
-		if (!cur)
-		{
-			free_struct(head);
-			return (NULL);
-		}
-		cur->argv = cmd[i];
-		cur->next = NULL;
-		cur->fd[0] = -1;
-		cur->fd[1] = -1;
-		if (prev)
-			prev->next = cur;
-		else
-			head = cur;
-		prev = cur;
-		i++;
+		dup2(fd[1], STDOUT_FILENO);
+		close(fd[0]);
+		close(fd[1]);
 	}
-	return (head);
-}
-
-void	child_process(t_cmd *cur, int in_fd)
-{
-	if (in_fd != 0)
-	{
-		dup2(in_fd, STDIN_FILENO);
-		close(in_fd);
-	}
-	if (cur->next != NULL)
-	{
-		dup2(cur->fd[1], STDOUT_FILENO);
-		close(cur->fd[0]);
-		close(cur->fd[1]);
-	}
-	execvp(cur->argv[0], cur->argv);
+	execvp(cmd[0], cmd);
 	exit(1);
 }
 
-void	parent_process(t_cmd **cur_ptr, int *in_fd)
+void	parent_process(int *prev_fd, int has_next, int *fd)
 {
-	t_cmd	*cur;
-
-	cur = *cur_ptr;
-	if (*in_fd != 0)
-		close(*in_fd);
-	if (cur->next != NULL)
-		close(cur->fd[1]);
-	if (cur->next != NULL)
-		*in_fd = cur->fd[0];
-	else
-		*in_fd = 0;
-	*cur_ptr = cur->next;
+	if (*prev_fd != -1)
+		close(*prev_fd);
+	if (has_next)
+	{
+		close(fd[1]);
+		*prev_fd = fd[0];
+	}
 }
 
-int	picoshell(char **cmds[])
+int	picoshell(char **cmd[])
 {
-	t_cmd	*head;
-	t_cmd	*cur;
+	int		fd[2];
 	pid_t	pid;
-	int		in_fd;
+	int		i;
+	int		prev_fd;
+	int		has_next;
 
-	in_fd = 0;
-	if ((head = init_struct(cmds)) == NULL)
+	i = 0;
+	prev_fd = -1;
+	has_next = 0;
+	if (!cmd)
 		return (1);
-	cur = head;
-	while (cur)
+	while (cmd[i])
 	{
-		if (cur->next != NULL)
+		has_next = cmd[i + 1] != NULL;
+		if (has_next)
 		{
-			if (pipe(cur->fd) < 0)
+			if (pipe(fd) < 0)
 			{
-				free_struct(head);
+				if (prev_fd != -1)
+					close(prev_fd);
 				return (1);
 			}
 		}
 		pid = fork();
 		if (pid < 0)
 		{
-			free_struct(head);
+			if (prev_fd != -1)
+				close(prev_fd);
+			if (has_next)
+			{
+				close(fd[0]);
+				close(fd[1]);
+			}
 			return (1);
 		}
 		if (pid == 0)
-			child_process(cur, in_fd);
+			child_process(cmd[i], prev_fd, has_next, fd);
 		else
-			parent_process(&cur, &in_fd);
+			parent_process(&prev_fd, has_next, fd);
+		i++;
 	}
 	while (wait(NULL) > 0)
 		;
-	free_struct(head);
 	return (0);
 }
 
 int	main(void)
 {
-	char	*cmd1[] = {"echo", "squalala", NULL};
-	char	*cmd2[] = {"cat", NULL};
-	char	*cmd3[] = {"sed", "s/a/b/g", NULL};
-	char	**test2[] = {cmd1, cmd2, cmd3, NULL};
+	char	*str[] = {"ls", NULL};
+	char	*str1[] = {"grep", "picoshell", NULL};
+	char	**cmd[] = {str, str1, NULL};
 
-	// char	*cmd1[] = {"/bin/ls", NULL};
-	// char	*cmd2[] = {"/usr/bin/grep", "picoshell", NULL};
-	// char	**test1[] = {cmd1, cmd2, NULL};
-	// picoshell(test1);
-	picoshell(test2);
+	picoshell(cmd);
 	return (0);
 }

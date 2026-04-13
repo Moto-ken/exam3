@@ -1,5 +1,5 @@
 
-#include "asfd.h"
+#include "vbc.h"
 
 node	*new_node(node n)
 {
@@ -57,7 +57,6 @@ node	*parse_value(char **s)
 {
 	node	*ret;
 	node	tmp;
-	node	*next;
 
 	if (isdigit(**s))
 	{
@@ -65,29 +64,29 @@ node	*parse_value(char **s)
 		tmp.val = **s - '0';
 		tmp.l = NULL;
 		tmp.r = NULL;
-		(*s)++;
 		ret = new_node(tmp);
 		if (!ret)
 			return (NULL);
-		if (isdigit(**s) || **s == '(')
+		(*s)++;
+		if (isdigit(**s))
 		{
-			destroy_tree(ret);
 			unexpected(**s);
+			destroy_tree(ret);
 			return (NULL);
 		}
 		return (ret);
 	}
 	if (expect(s, '('))
 	{
-		next = parse_add(s);
-		if (!next)
+		ret = parse_add(s);
+		if (!ret)
 			return (NULL);
 		if (!expect(s, ')'))
 		{
-			destroy_tree(next);
+			destroy_tree(ret);
 			return (NULL);
 		}
-		return (next);
+		return (ret);
 	}
 	unexpected(**s);
 	return (NULL);
@@ -163,9 +162,14 @@ node	*parse_tree(char *s)
 {
 	node	*ret;
 
+	if (!s)
+		return (NULL);
 	ret = parse_add(&s);
 	if (!ret)
+		return (NULL);
+	if (*s != '\0')
 	{
+		destroy_tree(ret);
 		return (NULL);
 	}
 	return (ret);
@@ -181,6 +185,8 @@ int	eval_tree(node *tree)
 		return (eval_tree(tree->l) * eval_tree(tree->r));
 	case VAL:
 		return (tree->val);
+	default:
+		return (0);
 	}
 }
 

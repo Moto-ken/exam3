@@ -5,7 +5,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-void	child_process(char type, const char *file, char *const argv[], int *fd)
+void	child_process(const char *file, char *const argv[], char type, int *fd)
 {
 	if (type == 'r')
 		dup2(fd[1], STDOUT_FILENO);
@@ -17,7 +17,7 @@ void	child_process(char type, const char *file, char *const argv[], int *fd)
 	exit(1);
 }
 
-int	parent_process(int *fd, char type)
+int	parent_process(char type, int *fd)
 {
 	if (type == 'r')
 	{
@@ -36,7 +36,7 @@ int	ft_popen(const char *file, char *const argv[], char type)
 	int		fd[2];
 	pid_t	pid;
 
-	if (!file || !argv || !argv[0] || (type != 'r' && type != 'w'))
+	if (!file || !argv || (type != 'r' && type != 'w'))
 		return (-1);
 	if (pipe(fd) < 0)
 		return (-1);
@@ -47,19 +47,18 @@ int	ft_popen(const char *file, char *const argv[], char type)
 		close(fd[1]);
 		return (-1);
 	}
-	if (pid == 0)
-		child_process(type, file, argv, fd);
-	return (parent_process(fd, type));
+	else if (pid == 0)
+		child_process(file, argv, type, fd);
+	return (parent_process(type, fd));
 }
 
 // int	main(void)
 // {
 // 	int		fd;
-// 	ssize_t	n;
 // 	char	buf[1000];
+// 	ssize_t	n;
 
-// 	n = 0;
-// 	fd = ft_popen("ls", (char *const[]){"ls", "-a", NULL}, 'r');
+// 	fd = ft_popen("ls", (char *const[]){"ls", NULL}, 'r');
 // 	while (n = read(fd, buf, sizeof(buf) - 1))
 // 	{
 // 		buf[n] = '\0';
@@ -71,11 +70,12 @@ int	ft_popen(const char *file, char *const argv[], char type)
 
 int	main(void)
 {
-	int		fd;
 	char	*data;
+	int		fd;
 
-	data = "8\n3\n7\n4\n";
+	data = "7\n3\n9\n";
 	fd = ft_popen("sort", (char *const[]){"sort", NULL}, 'w');
 	write(fd, data, strlen(data));
+	close(fd);
 	return (0);
 }
